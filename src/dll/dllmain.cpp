@@ -1,32 +1,39 @@
 #include "wph/wph.h"
-#include <windows.h>
+#include "../util/privilege.h"
+#include "../core/process_enumerator.h"
+#include <objbase.h> // For CoTaskMemAlloc
+#include <string>
 
-// DLL 入口点
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
-    switch (ul_reason_for_call) {
-        case DLL_PROCESS_ATTACH:
-            // DLL 被加载到进程时执行（尽量避免在此处做耗时操作）
-            DisableThreadLibraryCalls(hModule);
-            break;
-        case DLL_THREAD_ATTACH:
-        case DLL_THREAD_DETACH:
-        case DLL_PROCESS_DETACH:
-            break;
-    }
+    if (ul_reason_for_call == DLL_PROCESS_ATTACH) DisableThreadLibraryCalls(hModule);
     return TRUE;
 }
 
 extern "C" {
-    WPH_API const char* wph_get_version() {
-        return "1.0.0-alpha";
-    }
+    WPH_API const char* wph_get_version() { return "1.0.1-alpha"; }
 
     WPH_API int wph_initialize() {
-        // 预留：后续在这里初始化核心模块、日志系统等
-        return 0; // 0 表示成功
+        // 尝试提升权限，以便读取更多受保护的进程信息
+        wph::util::EnableDebugPrivilege();
+        return 0; 
     }
 
-    WPH_API void wph_shutdown() {
-        // 预留：后续在这里释放资源、关闭句柄等
+    WPH_API void wph_shutdown() {}
+
+    WPH_API char* wph_get_processes_json() {
+        auto processes = wph::core::EnumerateProcesses();
+        std::string json = wph::core::GenerateProcessesJson(processes);
+        
+        // 使用 COM 内存分配器，确保跨 DLL/EXE 边界释放安全
+        size_t len = json.length() + 1;
+        char* buffer = (char*)CoTaskMemAlloc(len);
+        if (buffer) {
+            memcpy(buffer, json.c_str(), len);
+        }
+        return buffer;
+    }
+
+    WPH_API void wph_free_string(char* str) {
+        if (str) CoTaskMemFree(str);
     }
 }
