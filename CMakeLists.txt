@@ -9,6 +9,7 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 # 警告与标准符合性
 add_compile_options(/W4 /permissive-)
+
 if(MSVC)
     add_compile_options(/utf-8)
 endif()
@@ -28,12 +29,27 @@ file(GLOB_RECURSE W32PH_EXE_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DI
 
 # 核心 DLL
 add_library(Win32ProcessHelper SHARED ${W32PH_DLL_SOURCES})
-target_include_directories(Win32ProcessHelper PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_include_directories(Win32ProcessHelper PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/dll)
-target_compile_definitions(Win32ProcessHelper PRIVATE W32PH_EXPORTS)
+
+target_include_directories(Win32ProcessHelper PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_include_directories(Win32ProcessHelper PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/dll
+)
+
+target_compile_definitions(Win32ProcessHelper PRIVATE
+    W32PH_EXPORTS
+)
 
 # CLI EXE 薄壳
 add_executable(Win32ProcessHelperCLI ${W32PH_EXE_SOURCES})
-target_include_directories(Win32ProcessHelperCLI PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+target_include_directories(Win32ProcessHelperCLI PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/exe
+)
+
 target_link_libraries(Win32ProcessHelperCLI PRIVATE Win32ProcessHelper)
+
 set_target_properties(Win32ProcessHelperCLI PROPERTIES OUTPUT_NAME Win32ProcessHelper)
