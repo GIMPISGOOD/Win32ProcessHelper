@@ -700,3 +700,289 @@ PROCESSENTRY32W::th32ParentProcessID
 未来如果新增接口，建议保持已有 C API 的兼容性。
 
 如果修改结构体或函数语义，应升级主版本号或明确标注 Breaking Change。
+下面按你的要求处理：
+
+1. **Git 日志只给一条可直接复制的正文**
+2. **新增第二个功能：详细进程列表**
+3. **新增第三个功能：单进程详细查看**
+4. **单进程详细查看默认返回 JSON，方便机器解析**
+5. **对中文做 UTF-8 适配**
+
+
+# 6. `docs/API.md` 需要追加的内容
+
+## 详细进程列表 API
+
+### `W32PH_PROCESS_INFO_EX`
+
+```cpp
+typedef struct W32PH_PROCESS_INFO_EX {
+    uint32_t processId;
+    uint32_t parentProcessId;
+    uint32_t threadCount;
+    int32_t basePriority;
+    char* imageName;
+} W32PH_PROCESS_INFO_EX;
+```
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `processId` | `uint32_t` | 进程 ID |
+| `parentProcessId` | `uint32_t` | 父进程 ID |
+| `threadCount` | `uint32_t` | 线程数 |
+| `basePriority` | `int32_t` | 基础优先级 |
+| `imageName` | `char*` | 进程映像名，UTF-8 编码 |
+
+---
+
+### `W32PH_EnumerateProcessesDetailed`
+
+```cpp
+W32PH_API int W32PH_EnumerateProcessesDetailed(
+    W32PH_PROCESS_INFO_EX** outProcesses,
+    uint32_t* outCount
+);
+```
+
+枚举当前系统的详细进程列表。
+
+成功后必须调用：
+
+```cpp
+W32PH_FreeProcessListDetailed(*outProcesses, *outCount);
+```
+
+---
+
+### `W32PH_FreeProcessListDetailed`
+
+```cpp
+W32PH_API void W32PH_FreeProcessListDetailed(
+    W32PH_PROCESS_INFO_EX* processes,
+    uint32_t count
+);
+```
+
+释放由 `W32PH_EnumerateProcessesDetailed` 返回的详细进程数组。
+
+---
+
+### `W32PH_GetProcessListDetailedJson`
+
+```cpp
+W32PH_API const char* W32PH_GetProcessListDetailedJson(void);
+```
+
+返回详细进程列表 JSON。
+
+返回值必须使用：
+
+```cpp
+W32PH_FreeString
+```
+
+释放。
+
+---
+
+### `W32PH_GetProcessDetailJson`
+
+```cpp
+W32PH_API const char* W32PH_GetProcessDetailJson(uint32_t processId);
+```
+
+根据进程 ID 查询单个进程的详细信息。
+
+返回值必须使用：
+
+```cpp
+W32PH_FreeString
+```
+
+释放。
+
+---
+
+## 单进程详细信息 JSON 格式
+
+```json
+{
+  "found": true,
+  "processId": 4,
+  "parentProcessId": 0,
+  "imageName": "System",
+  "threadCount": 0,
+  "basePriority": 0,
+  "openSucceeded": true,
+  "openErrorCode": 0,
+  "executablePathAvailable": true,
+  "executablePath": "C:\\Windows\\System32\\System",
+  "creationTimeAvailable": true,
+  "creationTimeUtc": "2026-10-25T08:00:00Z",
+  "kernelTimeTicks": 123456,
+  "userTimeTicks": 0,
+  "snapshotErrorCode": 0,
+  "errorMessage": null
+}
+```
+
+如果进程不存在：
+
+```json
+{
+  "found": false,
+  "processId": 999999,
+  "parentProcessId": 0,
+  "imageName": null,
+  "threadCount": 0,
+  "basePriority": 0,
+  "openSucceeded": false,
+  "openErrorCode": 0,
+  "executablePathAvailable": false,
+  "executablePath": null,
+  "creationTimeAvailable": false,
+  "creationTimeUtc": null,
+  "kernelTimeTicks": 0,
+  "userTimeTicks": 0,
+  "snapshotErrorCode": 127,
+  "errorMessage": "Process not found."
+}
+```
+
+---
+
+## CLI 命令
+
+```cmd
+Win32ProcessHelper.exe --BasicProcessEnumeration
+Win32ProcessHelper.exe --BasicProcessEnumeration --Json
+Win32ProcessHelper.exe --DetailedProcessEnumeration
+Win32ProcessHelper.exe --DetailedProcessEnumeration --Json
+Win32ProcessHelper.exe --ProcessDetail --ProcessId 4
+```
+
+---
+
+## Python 示例
+
+```python
+import ctypes
+
+dll = ctypes.CDLL("Win32ProcessHelper.dll")
+
+dll.W32PH_GetProcessListDetailedJson.restype = ctypes.c_void_p
+dll.W32PH_GetProcessListDetailedJson.argtypes = []
+
+dll.W32PH_GetProcessDetailJson.restype = ctypes.c_void_p
+dll.W32PH_GetProcessDetailJson.argtypes = [ctypes.c_uint32]
+
+dll.W32PH_FreeString.restype = None
+dll.W32PH_FreeString.argtypes = [ctypes.c_void_p]
+
+ptr = dll.W32PH_GetProcessDetailJson(4)
+if ptr:
+    text = ctypes.cast(ptr, ctypes.c_char_p).value.decode("utf-8")
+    dll.W32PH_FreeString(ptr)
+    print(text)
+```
+
+---
+
+## C# 示例
+
+```csharp
+using System;
+using System.Runtime.InteropServices;
+
+internal static class Program
+{
+    [DllImport("Win32ProcessHelper.dll", CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr W32PH_GetProcessDetailJson(uint processId);
+
+    [DllImport("Win32ProcessHelper.dll", CallingConvention = CallingConvention.Cdecl)]
+    private static extern void W32PH_FreeString(IntPtr str);
+
+    private static int Main()
+    {
+        IntPtr ptr = W32PH_GetProcessDetailJson(4);
+
+        if (ptr == IntPtr.Zero)
+        {
+            Console.Error.WriteLine("Failed to get process detail.");
+            return 1;
+        }
+
+        // 实际读取时请使用 UTF-8。
+        // 这里仅演示调用关系。
+        W32PH_FreeString(ptr);
+
+        return 0;
+    }
+}
+```
+```
+
+---
+
+# 7. README 可以顺手更新成这个
+
+```markdown
+# Win32ProcessHelper
+
+Windows 用户态进程管理工具。
+
+## 当前功能
+
+- 基础进程列表枚举
+- 详细进程列表枚举
+- 单进程详细信息查询
+- DLL 提供结构体接口与 JSON 接口
+- EXE 通过隐式链接调用 DLL
+
+## 命令
+
+```cmd
+Win32ProcessHelper.exe --BasicProcessEnumeration
+Win32ProcessHelper.exe --BasicProcessEnumeration --Json
+Win32ProcessHelper.exe --DetailedProcessEnumeration
+Win32ProcessHelper.exe --DetailedProcessEnumeration --Json
+Win32ProcessHelper.exe --ProcessDetail --ProcessId 4
+```
+```
+
+---
+
+# 8. 中文适配说明
+
+这次已经做了这些中文适配：
+
+1. Windows API 使用 `Process32FirstW` / `Process32NextW`；
+2. 内部字符串统一转换为 UTF-8；
+3. CLI 启动时执行：
+
+```cpp
+SetConsoleOutputCP(CP_UTF8);
+SetConsoleCP(CP_UTF8);
+```
+
+4. CMake 已启用：
+
+```cmake
+add_compile_options(/utf-8)
+```
+
+5. JSON 输出不会主动转义中文，只转义 JSON 必需字符；
+6. Python / C# 示例按 UTF-8 解码。
+
+如果你在 PowerShell 中解析输出，建议也先执行：
+
+```powershell
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+```
+
+例如：
+
+```powershell
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+.\Win32ProcessHelper.exe --ProcessDetail --ProcessId 4 | ConvertFrom-Json
+```

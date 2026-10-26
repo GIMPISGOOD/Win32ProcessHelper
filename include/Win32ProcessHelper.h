@@ -24,11 +24,19 @@ typedef struct W32PH_PROCESS_INFO {
     char* imageName;
 } W32PH_PROCESS_INFO;
 
+typedef struct W32PH_PROCESS_INFO_EX {
+    uint32_t processId;
+    uint32_t parentProcessId;
+    uint32_t threadCount;
+    int32_t basePriority;
+    char* imageName;
+} W32PH_PROCESS_INFO_EX;
+
 // 获取 DLL 版本。
 // 返回字符串由 DLL 分配，调用方必须调用 W32PH_FreeString 释放。
 W32PH_API const char* W32PH_GetVersion(void);
 
-// 枚举当前系统进程列表。
+// 枚举当前系统基础进程列表。
 // 成功返回 W32PH_OK。
 // outProcesses 由 DLL 分配，调用方必须调用 W32PH_FreeProcessList 释放。
 W32PH_API int W32PH_EnumerateProcesses(
@@ -42,10 +50,34 @@ W32PH_API void W32PH_FreeProcessList(
     uint32_t count
 );
 
-// 获取进程列表 JSON。
+// 枚举当前系统详细进程列表。
+// 成功返回 W32PH_OK。
+// outProcesses 由 DLL 分配，调用方必须调用 W32PH_FreeProcessListDetailed 释放。
+W32PH_API int W32PH_EnumerateProcessesDetailed(
+    W32PH_PROCESS_INFO_EX** outProcesses,
+    uint32_t* outCount
+);
+
+// 释放 W32PH_EnumerateProcessesDetailed 返回的进程数组。
+W32PH_API void W32PH_FreeProcessListDetailed(
+    W32PH_PROCESS_INFO_EX* processes,
+    uint32_t count
+);
+
+// 获取基础进程列表 JSON。
 // 返回字符串由 DLL 分配，调用方必须调用 W32PH_FreeString 释放。
 // 失败时返回 NULL。
 W32PH_API const char* W32PH_GetProcessListJson(void);
+
+// 获取详细进程列表 JSON。
+// 返回字符串由 DLL 分配，调用方必须调用 W32PH_FreeString 释放。
+// 失败时返回 NULL。
+W32PH_API const char* W32PH_GetProcessListDetailedJson(void);
+
+// 获取单个进程详细信息 JSON。
+// 返回字符串由 DLL 分配，调用方必须调用 W32PH_FreeString 释放。
+// 失败时返回 NULL。
+W32PH_API const char* W32PH_GetProcessDetailJson(uint32_t processId);
 
 // 释放由 DLL 分配的字符串内存。
 W32PH_API void W32PH_FreeString(const char* str);
