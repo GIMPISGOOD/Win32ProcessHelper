@@ -77,7 +77,7 @@ bool SnapshotAllProcessesDetailed(
         ProcessEntryEx item;
         item.processId = entry.th32ProcessID;
         item.parentProcessId = entry.th32ParentProcessID;
-        item.threadCount = entry.th32Threads;
+        item.threadCount = entry.cntThreads;
         item.basePriority = static_cast<int>(entry.pcPriClassBase);
 
         const size_t maxChars = sizeof(entry.szExeFile) / sizeof(entry.szExeFile[0]);
